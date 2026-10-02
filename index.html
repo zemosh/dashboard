@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Dnešek</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0E1620">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dnešek">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<main class="deck" id="deck">
+
+  <!-- ——— DEN ——— -->
+  <section class="screen" data-screen="day">
+    <div class="day-grid">
+      <div class="dial-wrap">
+        <svg class="dial" id="dial" viewBox="0 0 400 400" aria-hidden="true"></svg>
+        <div class="dial-center">
+          <div class="clock" id="clock">--:--</div>
+          <div class="date" id="date"></div>
+        </div>
+      </div>
+
+      <div class="day-side">
+        <div class="phase">
+          <div class="phase-name" id="phaseName">—</div>
+          <div class="phase-next" id="phaseNext"></div>
+          <div class="sun-line" id="sunLine"></div>
+        </div>
+
+        <div class="clocks" id="clocks"></div>
+
+        <div class="agenda">
+          <h2>Kalendář</h2>
+          <div id="agenda" class="agenda-list"><p class="muted">Načítám…</p></div>
+        </div>
+
+        <div class="now-wx" id="nowWx"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ——— POČASÍ ——— -->
+  <section class="screen" data-screen="weather">
+    <header class="screen-head">
+      <h1 id="wxPlace">Počasí</h1>
+      <span class="stamp" id="wxStamp"></span>
+    </header>
+    <div class="wx-now" id="wxNow"></div>
+    <div class="chart-box">
+      <div class="legend" id="wxLegend"></div>
+      <svg id="meteogram" viewBox="0 0 1000 340" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="days" id="wxDays"></div>
+  </section>
+
+  <!-- ——— RADAR ——— -->
+  <section class="screen screen--flush" data-screen="radar">
+    <div id="map"></div>
+    <div class="radar-bar">
+      <button id="radarPlay" class="btn" aria-label="Přehrát smyčku">Pauza</button>
+      <input id="radarSlider" class="slider" type="range" min="0" max="0" value="0" aria-label="Čas snímku">
+      <span class="stamp" id="radarStamp"></span>
+    </div>
+  </section>
+
+  <!-- ——— FOTKY ——— -->
+  <section class="screen screen--flush" data-screen="photos">
+    <div class="photo-stage" id="photoStage"></div>
+    <div class="photo-caption" id="photoCaption"></div>
+  </section>
+
+  <!-- ——— MEMENTO MORI ——— -->
+  <section class="screen" data-screen="memento">
+    <div class="mm">
+      <p class="mm-lede" id="mmLede"></p>
+      <div class="mm-grid" id="mmGrid" aria-hidden="true"></div>
+      <p class="mm-foot" id="mmFoot"></p>
+    </div>
+  </section>
+
+  <!-- ——— ZPRÁVY ——— -->
+  <section class="screen" data-screen="news">
+    <header class="screen-head"><h1>Zprávy</h1><span class="stamp" id="newsStamp"></span></header>
+    <div class="news-list" id="newsList"></div>
+  </section>
+
+</main>
+
+<nav class="dots" id="dots" aria-label="Obrazovky"></nav>
+<p class="credits">Data: Open-Meteo (CC BY 4.0) · radar <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Rain Viewer</a></p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

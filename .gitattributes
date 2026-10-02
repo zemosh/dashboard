@@ -1,0 +1,4 @@
+# Všechny textové soubory s konci řádků LF, i na Windows.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

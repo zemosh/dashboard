@@ -1,0 +1,6 @@
+{
+  "photos": [
+    { "src": "photos/priklad-1.jpg", "caption": "Popisek se zobrazí vlevo dole" },
+    { "src": "photos/priklad-2.jpg" }
+  ]
+}
