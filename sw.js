@@ -1,5 +1,5 @@
 /* Cache verzuj při každé změně souborů: */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = 'shell-' + VERSION;
 const RUNTIME = 'runtime-' + VERSION;
 
@@ -28,12 +28,16 @@ self.addEventListener('fetch', e => {
   /* Radarové dlaždice a OAuth nikdy necachujeme. */
   if (url.hostname.includes('rainviewer') || url.hostname.includes('google')) return;
 
-  /* Vlastní soubory: ze sítě, ale s okamžitým fallbackem na cache. */
+  /* Vlastní soubory: ze sítě, ale s okamžitým fallbackem na cache.
+     Ukládat jen skutečné soubory (ok + basic). Po vypršení přihlášení vrací
+     server přesměrování na auth.zemosh.cz a to se do cache dostat nesmí. */
   if (url.origin === location.origin) {
     e.respondWith(
       fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(SHELL).then(c => c.put(req, copy));
+        if (res.ok && res.type === 'basic' && !res.redirected) {
+          const copy = res.clone();
+          caches.open(SHELL).then(c => c.put(req, copy));
+        }
         return res;
       }).catch(() => caches.match(req).then(r => r || caches.match('index.html')))
     );

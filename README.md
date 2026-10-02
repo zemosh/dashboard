@@ -10,7 +10,21 @@ app.js       config.js  ← jediný soubor, který budeš měnit
 
 ## 1. Nahrání na web
 
-Aplikace potřebuje HTTPS (jinak nefunguje service worker ani přidání na plochu). Nejrychlejší cesty:
+Dashboard běží na **https://home.zemosh.cz** (server borderka, za přihlášením Authelia,
+účty `jiri` a `tv`). Nahrání nové verze z PowerShellu ve složce projektu:
+
+```
+wsl ./deploy.sh
+```
+
+Skript pošle soubory rsyncem přes SSH (`ssh borderka`) a smaže na serveru, co lokálně
+už není. Předtím zvyš `VERSION` v `sw.js`.
+
+Kvůli přihlašování má `<link rel="manifest">` atribut `crossorigin="use-credentials"`
+a service worker ukládá do cache jen skutečné soubory, ne přesměrování na přihlášení.
+
+Jiné možnosti hostingu (původní návod). Aplikace potřebuje HTTPS (jinak nefunguje
+service worker ani přidání na plochu). Nejrychlejší cesty:
 
 - **Cloudflare Pages** — Create project → Direct Upload → přetáhni celou složku.
 - **Netlify Drop** — app.netlify.com/drop, přetáhni složku, hotovo do minuty.
