@@ -42,7 +42,10 @@
           <div class="sun-line" id="sunLine"></div>
         </div>
 
-        <div class="clocks" id="clocks"></div>
+        <!-- světová mapa den/noc; místa a časy ze CFG.clocks (nahrazuje seznam světových hodin) -->
+        <div class="world" id="worldWrap">
+          <canvas id="world" role="img" aria-label="Světová mapa s denním a nočním osvětlením a časy vybraných míst"></canvas>
+        </div>
 
         <div class="agenda">
           <h2>Kalendář</h2>
@@ -88,7 +91,8 @@
   <section class="screen" data-screen="memento">
     <div class="mm">
       <p class="mm-lede" id="mmLede"></p>
-      <div class="mm-grid" id="mmGrid" aria-hidden="true"></div>
+      <p class="mm-kids" id="mmKids"></p>
+      <div class="mm-box" id="mmBox"><div class="mm-grid" id="mmGrid" aria-hidden="true"></div></div>
       <p class="mm-foot" id="mmFoot"></p>
     </div>
   </section>

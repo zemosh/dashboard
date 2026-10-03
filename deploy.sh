@@ -12,7 +12,7 @@ WIN_SSH=/mnt/c/Windows/System32/OpenSSH/ssh.exe
 [ -x "$WIN_SSH" ] && SSH=$WIN_SSH
 
 rsync -rtvz --delete --chmod=D755,F644 -e "$SSH" \
-    --exclude '.git*' --exclude deploy.sh --exclude README.md \
+    --exclude '.git*' --exclude deploy.sh --exclude '*.md' \
     ./ borderka:/srv/sites/home.zemosh.cz/
 
 echo

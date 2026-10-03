@@ -1,11 +1,12 @@
 /* Cache verzuj při každé změně souborů: */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL = 'shell-' + VERSION;
 const RUNTIME = 'runtime-' + VERSION;
 
 const SHELL_FILES = [
   './', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest',
-  'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
+  'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
+  'data/land.json'
 ];
 
 self.addEventListener('install', e => {
@@ -25,8 +26,10 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  /* Radarové dlaždice a OAuth nikdy necachujeme. */
-  if (url.hostname.includes('rainviewer') || url.hostname.includes('google')) return;
+  /* Mapové a radarové dlaždice a OAuth nikdy necachujeme: dlaždic jsou tisíce
+     a mezipaměť by rostla bez omezení. */
+  const NO_CACHE = ['rainviewer', 'arcgisonline', 'openstreetmap', 'cartocdn', 'accounts.google', 'googleapis.com/calendar'];
+  if (NO_CACHE.some(h => (url.hostname + url.pathname).includes(h))) return;
 
   /* Vlastní soubory: ze sítě, ale s okamžitým fallbackem na cache.
      Ukládat jen skutečné soubory (ok + basic). Po vypršení přihlášení vrací
@@ -52,6 +55,6 @@ self.addEventListener('fetch', e => {
         caches.open(RUNTIME).then(c => c.put(req, copy));
       }
       return res;
-    }).catch(() => caches.match(req))
+    }).catch(() => caches.match(req).then(r => r || Response.error()))
   );
 });

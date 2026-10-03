@@ -7,13 +7,14 @@ window.DASHBOARD_CONFIG = {
 
   /* Místo, podle kterého se počítá slunce, počasí i radar. */
   home: {
-    name: 'Praha',
-    lat: 50.0755,
-    lon: 14.4378,
-    tz: 'Europe/Prague'
+    name: 'Boston',
+    lat: 42.3601,
+    lon: -71.0589,
+    tz: 'America/New_York'
   },
 
-  /* Světový čas. lat/lon je volitelné – slouží jen k tečce den/noc. */
+  /* Světový čas. lat/lon je volitelné – slouží k tečce den/noc
+     a k vyznačení místa na světové mapě (úvodní obrazovka). */
   clocks: [
     { label: 'Praha',  tz: 'Europe/Prague',   lat: 50.0755, lon: 14.4378 },
     { label: 'Boston', tz: 'America/New_York', lat: 42.3601, lon: -71.0589 }
@@ -33,7 +34,7 @@ window.DASHBOARD_CONFIG = {
   },
 
   radar: {
-    zoom: 7,
+    zoom: 7,          // radarová data Rain Viewer mají nejvíc 7, víc je jen zvětšené
     frameMs: 420,     // rychlost animace
     colorScheme: 4,   // 0–8, viz rainviewer.com/api/color-schemes.html
     smooth: 1,
@@ -65,9 +66,17 @@ window.DASHBOARD_CONFIG = {
     shuffle: true
   },
 
+  /* Data narození: známý je jen rok, proto 1. července (střed roku).
+     Přesné datum zpřesní počty týdnů i víkendů.                        */
   mementoMori: {
-    birthDate: '1985-06-14',
-    lifeExpectancy: 85
+    birthDate: '1984-07-01',
+    lifeExpectancy: 85,
+    /* Víkendy s dětmi: kolik víkendů zbývá, než dítěti bude `childhoodEnd` let. */
+    children: [
+      { label: 'starší', birthDate: '2012-07-01' },
+      { label: 'mladší', birthDate: '2015-07-01' }
+    ],
+    childhoodEnd: 18
   },
 
   /* Pořadí obrazovek. Odeber, co nechceš. */

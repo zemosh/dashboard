@@ -87,7 +87,8 @@ Service worker si soubory cachuje. Po úpravě `config.js` nebo čehokoli jinéh
 
 - **Open-Meteo** — bez klíče, zdarma pro nekomerční použití, data pod CC BY 4.0. Předpověď se stahuje každých 10 minut a poslední odpověď se ukládá, takže při výpadku sítě uvidíš to poslední.
 - **Rain Viewer** — radar zdarma pro osobní použití, snímky po 10 minutách za poslední 2 hodiny, bez záruky dostupnosti. Podmínkou je viditelné uvedení zdroje, které je v patičce — neodstraňuj ho.
-- **CARTO / OpenStreetMap** — podkladová mapa pod radarem.
+- **Esri Dark Gray** — podkladová mapa pod radarem (server.arcgisonline.com, bez klíče; uvedení zdroje v rohu mapy neodstraňovat). CARTO od roku 2026 vyžaduje API klíč, OpenStreetMap odmítá požadavky bez adresy stránky (např. z `file://`).
+- **Natural Earth** (public domain) — obrysy pevnin pro světovou mapu, `data/land.json`.
 
 ## 9. Co zatím neumí
 

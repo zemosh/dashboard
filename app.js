@@ -76,6 +76,8 @@ function markActive() {
   $$('#dots button').forEach((b, n) => b.setAttribute('aria-current', n === i ? 'true' : 'false'));
   if (screens[i] && screens[i].dataset.screen === 'radar' && radarMap) {
     setTimeout(() => radarMap.invalidateSize(), 60);
+    /* radar se stahuje až při prvním zobrazení (stovky dlaždic, Rain Viewer omezuje) */
+    if (!radarShown) { radarShown = true; loadRadar(); }
   }
 }
 document.addEventListener('keydown', e => {
@@ -201,6 +203,137 @@ function drawDial() {
 }
 
 /* ==================================================================
+   2b. Světová mapa: den a noc
+   ================================================================== */
+let landRings = null;
+
+async function initWorld() {
+  if (!$('#world')) return;
+  try {
+    landRings = (await fetchJSON('data/land.json')).rings;   // Natural Earth 1:110m
+  } catch (e) {
+    landRings = [];
+  }
+  drawWorld();
+}
+
+/* Bod, nad kterým je Slunce v nadhlavníku (přibližné vzorce, přesnost ~0,1°). */
+function subsolarPoint(date) {
+  const rad = Math.PI / 180;
+  const n = date.getTime() / 86400000 - 10957.5;            // dny od J2000.0
+  const L = 280.46 + 0.9856474 * n;
+  const g = (357.528 + 0.9856003 * n) * rad;
+  const lambda = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * rad;
+  const eps = (23.439 - 0.0000004 * n) * rad;
+  const dec = Math.asin(Math.sin(eps) * Math.sin(lambda));
+  const ra = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda));
+  const gmst = (280.46061837 + 360.98564736629 * n) * rad;
+  const lon = ((((ra - gmst) / rad) % 360) + 540) % 360 - 180;
+  return { lat: dec / rad, lon: lon };
+}
+
+/* Noční stín v rozlišení 1° (360 × 180), prohlížeč ho při kreslení vyhladí.
+   Den = průhledné, za soumraku plynulý přechod, pod −12° plná noc. */
+function nightShade(sun) {
+  const off = document.createElement('canvas');
+  off.width = 360; off.height = 180;
+  const octx = off.getContext('2d');
+  const img = octx.createImageData(360, 180);
+  const rad = Math.PI / 180;
+  const sd = Math.sin(sun.lat * rad), cd = Math.cos(sun.lat * rad);
+  for (let j = 0; j < 180; j++) {
+    const lat = (89.5 - j) * rad;
+    const sl = Math.sin(lat), cl = Math.cos(lat);
+    for (let i = 0; i < 360; i++) {
+      const h = (-179.5 + i - sun.lon) * rad;
+      const alt = Math.asin(sl * sd + cl * cd * Math.cos(h)) / rad;
+      const t = alt >= 0 ? 0 : Math.min(1, -alt / 12);
+      const k = (j * 360 + i) * 4;
+      img.data[k] = 3; img.data[k + 1] = 7; img.data[k + 2] = 13;
+      img.data[k + 3] = Math.round(t * 190);
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  return off;
+}
+
+function drawWorld() {
+  const cv = $('#world'), box = $('#worldWrap');
+  if (!cv || !box || !landRings) return;
+  const cs = getComputedStyle(box);
+  const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const w = Math.floor(Math.min(box.clientWidth, availH * 2));
+  if (w < 60) return;
+  const h = w / 2, dpr = window.devicePixelRatio || 1;
+  cv.style.width = w + 'px';
+  cv.style.height = h + 'px';
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const X = lon => (lon + 180) / 360 * w;
+  const Y = lat => (90 - lat) / 180 * h;
+
+  /* oceán a pevnina */
+  ctx.fillStyle = '#0B1621';
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#34495D';
+  ctx.beginPath();
+  landRings.forEach(r => {
+    r.forEach((p, i) => {
+      /* skok přes datovou hranici (Fidži, Čukotka): nekreslit čáru přes celou mapu */
+      if (i && Math.abs(p[0] - r[i - 1][0]) < 180) ctx.lineTo(X(p[0]), Y(p[1]));
+      else ctx.moveTo(X(p[0]), Y(p[1]));
+    });
+    ctx.closePath();
+  });
+  ctx.fill('evenodd');
+
+  /* noc */
+  const now = new Date();
+  const sun = subsolarPoint(now);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(nightShade(sun), 0, 0, w, h);
+
+  /* Slunce v nadhlavníku */
+  const sx = X(sun.lon), sy = Y(sun.lat);
+  const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, h * 0.12);
+  glow.addColorStop(0, 'rgba(239,168,85,.45)');
+  glow.addColorStop(1, 'rgba(239,168,85,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(sx - h * 0.12, sy - h * 0.12, h * 0.24, h * 0.24);
+  ctx.fillStyle = '#EFA855';
+  ctx.beginPath(); ctx.arc(sx, sy, Math.max(2.5, h * 0.012), 0, 2 * Math.PI); ctx.fill();
+
+  /* místa ze světového času (s lat/lon); domov zvýrazněný */
+  const fs = Math.max(11, Math.round(h * 0.055));
+  ctx.font = '500 ' + fs + 'px Archivo, system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  CFG.clocks.filter(c => c.lat !== undefined).forEach(c => {
+    const px = X(c.lon), py = Y(c.lat);
+    const home = c.tz === CFG.home.tz;
+    const r = Math.max(3, h * (home ? 0.018 : 0.014));
+    ctx.beginPath(); ctx.arc(px, py, r + 3, 0, 2 * Math.PI);
+    ctx.fillStyle = 'rgba(14,22,32,.75)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(px, py, r, 0, 2 * Math.PI);
+    ctx.fillStyle = home ? '#EFA855' : '#E6EDF3'; ctx.fill();
+    /* posun proti domovu a jiné datum, pokud tam už/ještě je jiný den */
+    const offH = (tzOffsetMs(now, c.tz) - tzOffsetMs(now, CFG.home.tz)) / 3600000;
+    const offTxt = offH ? ' ' + (offH > 0 ? '+' : '−') + Math.abs(offH).toString().replace('.', ',') + ' h' : '';
+    const other = fmt(now, c.tz, { day: 'numeric', month: 'numeric' });
+    const dayTxt = other !== fmt(now, CFG.home.tz, { day: 'numeric', month: 'numeric' }) ? ' · ' + other : '';
+    const label = c.label + ' ' + hhmm(now, c.tz) + offTxt + dayTxt;
+    const tw = ctx.measureText(label).width;
+    const right = px + r + 8 + tw < w - 4;
+    const lx = right ? px + r + 8 : px - r - 8 - tw;
+    ctx.fillStyle = 'rgba(14,22,32,.7)';
+    ctx.fillRect(lx - 4, py - fs * 0.7, tw + 8, fs * 1.4);
+    ctx.fillStyle = home ? '#EFA855' : '#E6EDF3';
+    ctx.fillText(label, lx, py);
+  });
+}
+
+/* ==================================================================
    3. Hodiny a světový čas
    ================================================================== */
 function tickClock() {
@@ -210,6 +343,7 @@ function tickClock() {
   $('#clock').textContent = hhmm(now, tz);
   $('#date').textContent = fmt(now, tz, { weekday: 'long', day: 'numeric', month: 'long' });
 
+  if (!$('#clocks')) return;   // seznam hodin je volitelný, časy ukazuje i světová mapa
   const homeDay = fmt(now, tz, { day: '2-digit', month: '2-digit' });
   $('#clocks').innerHTML = CFG.clocks.map(c => {
     const offH = (tzOffsetMs(now, c.tz) - tzOffsetMs(now, tz)) / 3600000;
@@ -459,19 +593,30 @@ function drawMeteogram() {
    5. Meteoradar
    ================================================================== */
 let radarMap = null, radarFrames = [], radarLayers = [], radarIdx = 0, radarTimer = null, radarPlaying = true;
+let radarShown = false;
 
 async function initRadar() {
   if (!$('#map') || !window.L) return;
-  radarMap = L.map('map', { zoomControl: false, attributionControl: true })
-    .setView([CFG.home.lat, CFG.home.lon], CFG.radar.zoom);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap, © CARTO', maxZoom: 18
+  /* Mapa nereaguje na posun prstem ani kolečko: swipe musí přepínat obrazovky
+     (hlavně na iPadu). Přiblížení jen tlačítky +/−, střed zůstává na domově. */
+  radarMap = L.map('map', {
+    zoomControl: false, attributionControl: true,
+    dragging: false, touchZoom: false, scrollWheelZoom: false,
+    doubleClickZoom: false, boxZoom: false, keyboard: false
+  }).setView([CFG.home.lat, CFG.home.lon], CFG.radar.zoom);
+  L.control.zoom({ position: 'topright', zoomInTitle: 'Přiblížit', zoomOutTitle: 'Oddálit' }).addTo(radarMap);
+  /* Podklad Esri Dark Gray (bez klíče, nevyžaduje Referer; CARTO od 2026 chce klíč,
+     OpenStreetMap odmítá požadavky bez adresy stránky). Popisky jsou zvlášť,
+     ve vlastní vrstvě nad radarem, aby je srážky nepřekryly. */
+  const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+  L.tileLayer(esri + 'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Podklad © Esri, HERE, Garmin, © OpenStreetMap', maxZoom: 16
   }).addTo(radarMap);
   radarMap.createPane('labels');
   radarMap.getPane('labels').style.zIndex = 650;
   radarMap.getPane('labels').style.pointerEvents = 'none';
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',
-    { pane: 'labels', maxZoom: 18 }).addTo(radarMap);
+  L.tileLayer(esri + 'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+    { pane: 'labels', maxZoom: 16 }).addTo(radarMap);
 
   $('#radarPlay').addEventListener('click', () => {
     radarPlaying = !radarPlaying;
@@ -483,7 +628,7 @@ async function initRadar() {
     showFrame(parseInt(e.target.value, 10));
   });
 
-  await loadRadar();
+  if (radarShown) await loadRadar();
   clearInterval(radarTimer);
   radarTimer = setInterval(() => {
     if (radarPlaying && radarFrames.length) showFrame((radarIdx + 1) % radarFrames.length);
@@ -491,7 +636,7 @@ async function initRadar() {
 }
 
 async function loadRadar() {
-  if (!radarMap) return;
+  if (!radarMap || !radarShown) return;
   let j;
   try {
     j = await fetchJSON('https://api.rainviewer.com/public/weather-maps.json');
@@ -574,30 +719,81 @@ function nextPhoto() {
 /* ==================================================================
    7. Memento mori
    ================================================================== */
+const WEEK_MS = 7 * 86400000;
+let mmByColumns = false;   // true = roky ve sloupcích (na šířku), false = v řádcích
+
+/* Kolik sobot zbývá od teď do daného data. */
+function saturdaysUntil(end) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));
+  return d > end ? 0 : Math.floor((end - d) / WEEK_MS) + 1;
+}
+
 function renderMemento() {
   const grid = $('#mmGrid');
   if (!grid) return;
-  const birth = new Date(CFG.mementoMori.birthDate + 'T00:00:00');
-  const years = CFG.mementoMori.lifeExpectancy;
-  const weekMs = 7 * 86400000;
-  const lived = Math.floor((Date.now() - birth.getTime()) / weekMs);
-  const total = years * 52;
+  const mm = CFG.mementoMori;
+  const birth = new Date(mm.birthDate + 'T00:00:00');
+  const total = mm.lifeExpectancy * 52;
+  const lived = Math.floor((Date.now() - birth.getTime()) / WEEK_MS);
+  const fmtN = n => n.toLocaleString('cs-CZ');
+
+  /* týdny, kdy je aspoň jedno dítě mladší než childhoodEnd */
+  const kids = (mm.children || []).map(k => {
+    const end = new Date(k.birthDate + 'T00:00:00');
+    end.setFullYear(end.getFullYear() + (mm.childhoodEnd || 18));
+    return { label: k.label, end: end, weekends: saturdaysUntil(end) };
+  });
+  const kidsUntilWeek = kids.length
+    ? Math.floor((Math.max(...kids.map(k => k.end.getTime())) - birth.getTime()) / WEEK_MS) : -1;
 
   const frag = document.createDocumentFragment();
   for (let i = 0; i < total; i++) {
     const s = document.createElement('span');
     if (i < lived) s.className = 'past';
     else if (i === lived) s.className = 'now';
+    else if (i <= kidsUntilWeek) s.className = 'kids';
     frag.appendChild(s);
   }
   grid.innerHTML = '';
   grid.appendChild(frag);
 
   const days = Math.floor((Date.now() - birth.getTime()) / 86400000);
-  const fmtN = n => n.toLocaleString('cs-CZ');
   $('#mmLede').textContent = 'Žiješ ' + fmtN(days) + '. den.';
-  $('#mmFoot').textContent = 'Za sebou ' + fmtN(lived) + ' týdnů z ' + fmtN(total) +
-    '. Každý řádek je jeden rok, každé políčko jeden týden.';
+  $('#mmKids').textContent = kids.length
+    ? 'Víkendů s dětmi, než jim bude ' + (mm.childhoodEnd || 18) + ': ' +
+      kids.map(k => k.label + ' ' + fmtN(k.weekends)).join(', ') + '.'
+    : '';
+  $('#mmKids').hidden = !kids.length;
+  $('#mmFoot').dataset.lived = fmtN(lived);
+  $('#mmFoot').dataset.total = fmtN(total);
+  layoutMemento();
+}
+
+/* Mřížku přizpůsobit místu: roky v řádcích (na výšku) nebo ve sloupcích (na šířku),
+   podle toho, kde vyjdou políčka větší. Celá musí být vidět bez posouvání. */
+function layoutMemento() {
+  const grid = $('#mmGrid'), box = $('#mmBox');
+  if (!grid || !box || !box.clientHeight) return;
+  const years = CFG.mementoMori.lifeExpectancy;
+  const W = box.clientWidth, H = box.clientHeight;
+  const fit = (cols, rows) => Math.min(W / cols, H / rows);
+  mmByColumns = fit(years, 52) > fit(52, years);
+  const cols = mmByColumns ? years : 52, rows = mmByColumns ? 52 : years;
+  const pitch = Math.max(2, Math.floor(fit(cols, rows)));
+  const gap = pitch >= 7 ? 2 : 1;
+  const cell = pitch - gap;
+  grid.style.gap = gap + 'px';
+  grid.style.gridAutoFlow = mmByColumns ? 'column' : 'row';
+  grid.style.gridTemplateColumns = mmByColumns ? 'repeat(' + cols + ', ' + cell + 'px)' : 'repeat(52, ' + cell + 'px)';
+  grid.style.gridTemplateRows = 'repeat(' + rows + ', ' + cell + 'px)';
+
+  const foot = $('#mmFoot');
+  foot.textContent = 'Za sebou ' + foot.dataset.lived + ' týdnů z ' + foot.dataset.total + '. ' +
+    (mmByColumns ? 'Každý sloupec je jeden rok' : 'Každý řádek je jeden rok') +
+    ', každé políčko jeden týden' +
+    ((CFG.mementoMori.children || []).length ? ', fialově týdny, kdy jsou děti ještě doma.' : '.');
 }
 
 /* ==================================================================
@@ -774,8 +970,9 @@ function start() {
 
   tickClock();
   drawDial();
+  initWorld();
   setInterval(tickClock, 1000);
-  setInterval(drawDial, 60000);
+  setInterval(() => { drawDial(); drawWorld(); }, 60000);
 
   renderMemento();
   setInterval(renderMemento, 3600000);
@@ -796,12 +993,24 @@ function start() {
   keepAwake();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
-    tickClock(); drawDial(); loadWeather(); loadRadar();
+    tickClock(); drawDial(); drawWorld(); loadWeather(); loadRadar();
     if (gToken) loadEvents();
     loadNews(); keepAwake();
   });
 
   window.addEventListener('resize', () => { markActive(); });
+  /* Mapa a memento se překreslí, kdykoli se změní jejich plocha (otočení iPadu,
+     změna okna, dorazivší kalendář). Spolehlivější než událost resize okna. */
+  if ('ResizeObserver' in window) {
+    const watch = (sel, fn) => {
+      const el = $(sel);
+      if (!el) return;
+      let t = null;
+      new ResizeObserver(() => { clearTimeout(t); t = setTimeout(fn, 100); }).observe(el);
+    };
+    watch('#worldWrap', drawWorld);
+    watch('#mmBox', layoutMemento);
+  }
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
